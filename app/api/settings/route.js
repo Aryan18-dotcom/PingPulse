@@ -1,29 +1,33 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import { connectDB } from '@/lib/db';
 import Settings from '@/models/Settings';
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return new NextResponse('Unauthorized', { status: 401 });
+
   await connectDB();
-  let settings = await Settings.findOne({});
+  let settings = await Settings.findOne({ userId: session.user.id });
   if (!settings) {
-    settings = await Settings.create({});
+    settings = await Settings.create({ userId: session.user.id });
   }
   return NextResponse.json(settings);
 }
 
 export async function POST(request) {
+  const session = await auth();
+  if (!session?.user?.id) return new NextResponse('Unauthorized', { status: 401 });
+
   await connectDB();
   const body = await request.json();
   const { telegram, email } = body;
 
-  let settings = await Settings.findOne({});
-  if (!settings) {
-    settings = await Settings.create({ telegram, email });
-  } else {
-    settings.telegram = telegram;
-    settings.email = email;
-    await settings.save();
-  }
+  const settings = await Settings.findOneAndUpdate(
+    { userId: session.user.id },
+    { telegram, email },
+    { upsert: true, returnDocument: 'after' }
+  );
 
   return NextResponse.json(settings);
 }

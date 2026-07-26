@@ -11,7 +11,6 @@ export async function GET(request) {
   }
 
   await connectDB();
-  const globalSettings = await Settings.findOne({}) || {};
   const projects = await Project.find({ isActive: true });
   const now = new Date();
 
@@ -30,7 +29,7 @@ export async function GET(request) {
 
       try {
         const response = await fetch(project.url, {
-          headers: { 'User-Agent': 'SiteAliver-PingEngine/1.0' },
+          headers: { 'User-Agent': 'PingPulse-Engine/1.0' },
           signal: AbortSignal.timeout(10000),
         });
 
@@ -44,6 +43,9 @@ export async function GET(request) {
       const wasDown = project.isDown;
       const nowIsDown = !success;
 
+      // Fetch the specific user's notification settings
+      const userSettings = await Settings.findOne({ userId: project.userId }) || {};
+
       // 🚨 SITE DOWN ALERT
       if (nowIsDown && !wasDown) {
         const telegramMsg = `🚨 <b>Site Down Alert!</b>\n\n` +
@@ -53,7 +55,7 @@ export async function GET(request) {
           `<b>Error:</b> ${errorMessage || 'HTTP Error'}\n` +
           `<b>Time:</b> ${now.toLocaleString()}`;
 
-        const emailSubject = `🚨 [SiteAliver Alert] ${project.name} is DOWN!`;
+        const emailSubject = `🚨 [PingPulse Alert] ${project.name} is DOWN!`;
         const emailBody = `
           <div style="font-family: sans-serif; padding: 20px; background: #111; color: #fff;">
             <h2 style="color: #ef4444;">🚨 Site Down Alert</h2>
@@ -66,8 +68,8 @@ export async function GET(request) {
         `;
 
         const alertPromises = [];
-        if (project.notifyTelegram) alertPromises.push(sendTelegramNotification(globalSettings, telegramMsg));
-        if (project.notifyEmail) alertPromises.push(sendEmailNotification(globalSettings, emailSubject, emailBody));
+        if (project.notifyTelegram) alertPromises.push(sendTelegramNotification(userSettings, telegramMsg));
+        if (project.notifyEmail) alertPromises.push(sendEmailNotification(userSettings, emailSubject, emailBody));
         await Promise.all(alertPromises);
       }
 
@@ -80,7 +82,7 @@ export async function GET(request) {
           `<b>Latency:</b> ${duration}ms\n` +
           `<b>Time:</b> ${now.toLocaleString()}`;
 
-        const emailSubject = `✅ [SiteAliver Alert] ${project.name} is RESTORED!`;
+        const emailSubject = `✅ [PingPulse Alert] ${project.name} is RESTORED!`;
         const emailBody = `
           <div style="font-family: sans-serif; padding: 20px; background: #111; color: #fff;">
             <h2 style="color: #10b981;">✅ Site Restored</h2>
@@ -93,8 +95,8 @@ export async function GET(request) {
         `;
 
         const alertPromises = [];
-        if (project.notifyTelegram) alertPromises.push(sendTelegramNotification(globalSettings, recoveryMsg));
-        if (project.notifyEmail) alertPromises.push(sendEmailNotification(globalSettings, emailSubject, emailBody));
+        if (project.notifyTelegram) alertPromises.push(sendTelegramNotification(userSettings, recoveryMsg));
+        if (project.notifyEmail) alertPromises.push(sendEmailNotification(userSettings, emailSubject, emailBody));
         await Promise.all(alertPromises);
       }
 

@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import './globals.css'
+import { SessionProvider } from "next-auth/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,11 +43,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body
-        suppressHydrationWarning
-        className="min-h-screen bg-neutral-950 text-neutral-100 font-sans antialiased"
-      >
-        {children}
+      <body suppressHydrationWarning className="min-h-screen bg-neutral-950 text-neutral-100 font-sans antialiased">
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

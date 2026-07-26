@@ -45,19 +45,36 @@ function AuthGuard({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Auto-login if user clicked the magic link from email
+  // 1. Auto-login handler for email link clicks
+  // Inside AuthGuard in app/page.js
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const isAutoLogin = urlParams.get('autoLogin');
     const linkEmail = urlParams.get('email');
     const linkCode = urlParams.get('code');
 
-    if (linkEmail && linkCode) {
+    if (errorParam === 'ExpiredCode') {
+      setError('The verification link has expired or was already used. Please request a new code.');
+    } else if (errorParam === 'InvalidLink') {
+      setError('Invalid verification link.');
+    }
+
+    if (isAutoLogin && linkEmail && linkCode) {
       setLoading(true);
       signIn('otp-credentials', {
         email: linkEmail,
         code: linkCode,
-        callbackUrl: '/',
-      }).catch(() => setError('Failed to auto-verify link.'));
+        redirect: false,
+      }).then((res) => {
+        if (res?.ok && !res?.error) {
+          // Clean URL params and refresh session
+          window.location.href = '/';
+        } else {
+          setError('Verification link expired or invalid code.');
+          setLoading(false);
+        }
+      });
     }
   }, []);
 
@@ -98,23 +115,30 @@ function AuthGuard({ children }) {
       }
     };
 
+    // 2. Manual 6-Digit Code Form Submission
     const handleVerifyCode = async (e) => {
       e.preventDefault();
       if (!otpCode) return;
       setLoading(true);
       setError('');
 
-      const res = await signIn('otp-credentials', {
-        email,
-        code: otpCode,
-        redirect: false,
-      });
+      try {
+        const res = await signIn('otp-credentials', {
+          email,
+          code: otpCode,
+          redirect: false,
+        });
 
-      if (res?.error) {
-        setError('Invalid or expired code. Please try again.');
+        if (res?.error || !res?.ok) {
+          setError('Invalid or expired 6-digit code.');
+          setLoading(false);
+        } else {
+          // Success! Hard redirect to reload NextAuth JWT session
+          window.location.href = '/';
+        }
+      } catch (err) {
+        setError('Authentication failed.');
         setLoading(false);
-      } else {
-        window.location.href = '/';
       }
     };
 
@@ -157,7 +181,7 @@ function AuthGuard({ children }) {
           ) : (
             <div className="space-y-4">
               <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs text-left">
-                ✉️ Access code sent to <b className="text-emerald-300">{email}</b>. Type the 6-digit code below or click the link in your email.
+                ✉️ Access code sent to <b className="text-emerald-300">{email}</b>. Enter the 6-digit code below or click the link in your email.
               </div>
 
               <form onSubmit={handleVerifyCode} className="space-y-4">
@@ -185,7 +209,7 @@ function AuthGuard({ children }) {
 
               <button
                 type="button"
-                onClick={() => { setSubmitted(false); setOtpCode(''); }}
+                onClick={() => { setSubmitted(false); setOtpCode(''); setError(''); }}
                 className="text-xs text-neutral-500 hover:text-neutral-300 transition"
               >
                 ← Use a different email address
@@ -310,7 +334,7 @@ export default function DashboardPage() {
     <AuthGuard>
       <div className="min-h-screen bg-neutral-950 text-neutral-100 p-8 font-sans">
         <div className="max-w-4xl mx-auto space-y-8">
-          
+
           <header className="flex justify-between items-center border-b border-neutral-800 pb-6">
             <div>
               <h1 className="text-3xl font-bold text-white tracking-tight">PingPulse</h1>
@@ -449,9 +473,9 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="pt-2 border-t border-neutral-800/60 flex items-center justify-between">
-                      <NextPingCountdown 
-                        lastChecked={project.lastChecked} 
-                        pingInterval={project.pingInterval} 
+                      <NextPingCountdown
+                        lastChecked={project.lastChecked}
+                        pingInterval={project.pingInterval}
                       />
                       <span className="text-xs text-neutral-500 font-mono">
                         Last ping: {project.lastChecked ? new Date(project.lastChecked).toLocaleTimeString() : 'Never'}

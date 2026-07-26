@@ -7,18 +7,26 @@ export async function GET(request) {
   const email = searchParams.get('email');
   const code = searchParams.get('code');
 
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+
   if (!email || !code) {
-    return NextResponse.redirect(new URL('/?error=InvalidLink', request.url));
+    return NextResponse.redirect(`${baseUrl}/?error=InvalidLink`);
   }
 
   await connectDB();
-  const validOtp = await OTP.findOne({ email: email.toLowerCase(), code });
+
+  // Check if valid code exists before triggering client auto-login
+  const validOtp = await OTP.findOne({ 
+    email: email.trim().toLowerCase(), 
+    code: code.trim() 
+  });
 
   if (!validOtp) {
-    return NextResponse.redirect(new URL('/?error=ExpiredCode', request.url));
+    return NextResponse.redirect(`${baseUrl}/?error=ExpiredCode`);
   }
 
-  // Pass credentials to sign in
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-  return NextResponse.redirect(`${baseUrl}/?email=${encodeURIComponent(email)}&code=${code}`);
+  // Redirect to homepage with query flags for client auto-login
+  return NextResponse.redirect(
+    `${baseUrl}/?autoLogin=true&email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`
+  );
 }
